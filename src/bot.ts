@@ -52,41 +52,6 @@ import {
   type BroadcastStore,
 } from "./commands/broadcast.js";
 
-/** Telegram bot tokens have the shape `<digits>:<35+ url-safe chars>`. */
-export type BotTokenShapeProblem =
-  | "empty"
-  | "surrounding-quotes"
-  | "whitespace"
-  | "missing-colon"
-  | "wrong-shape";
-
-export interface BotTokenShapeResult {
-  ok: boolean;
-  problem?: BotTokenShapeProblem;
-  message?: string;
-}
-
-const BOT_TOKEN_SHAPE = /^\d+:[A-Za-z0-9_-]{35,}$/;
-
-export function validateBotTokenShape(raw: unknown): BotTokenShapeResult {
-  if (typeof raw !== "string" || raw.length === 0) {
-    return { ok: false, problem: "empty", message: "BOT_TOKEN is empty; expected <digits>:<35+ url-safe chars>." };
-  }
-  if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
-    return { ok: false, problem: "surrounding-quotes", message: "BOT_TOKEN is wrapped in quotes; remove the surrounding quotes and retry." };
-  }
-  if (/\s/.test(raw)) {
-    return { ok: false, problem: "whitespace", message: "BOT_TOKEN contains whitespace; trim it and retry." };
-  }
-  if (!raw.includes(":")) {
-    return { ok: false, problem: "missing-colon", message: "BOT_TOKEN is missing the ':' separator; expected <digits>:<35+ url-safe chars>." };
-  }
-  if (!BOT_TOKEN_SHAPE.test(raw)) {
-    return { ok: false, problem: "wrong-shape", message: "BOT_TOKEN has the wrong shape; expected <digits>:<35+ url-safe chars>." };
-  }
-  return { ok: true };
-}
-
 /** Shared metadata for handlers, help, and Telegram's command menu. */
 export const COMMANDS = [
   { command: "start", description: COMMAND_DESCRIPTIONS.start, operatorOnly: false },
@@ -1065,13 +1030,6 @@ export function createBot(deps: BotDeps): Bot {
     deps.config.telegramApiRoot !== undefined && deps.config.telegramApiRoot !== null
       ? { client: { apiRoot: deps.config.telegramApiRoot } }
       : undefined;
-  const tokenCheck = validateBotTokenShape(deps.config.botToken);
-  if (!tokenCheck.ok) {
-    // Never include the token (or any part of it) in the thrown error.
-    throw new Error(
-      `Invalid BOT_TOKEN (${tokenCheck.problem}): ${tokenCheck.message}`,
-    );
-  }
   const bot = new Bot(
     deps.config.botToken,
     deps.botInfo !== undefined
